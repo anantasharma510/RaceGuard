@@ -5,26 +5,18 @@ import * as fs from 'fs';
 
 const isWindows = process.platform === 'win32';
 
-function spawnBackground(cmd: string, args: string[], cwd?: string) {
+function spawnBackground(cmd: string, args: string[], cwd?: string, useShell = false) {
   const opts: SpawnOptions = {
     stdio: 'ignore',
     detached: true,
     cwd,
+    shell: useShell,
+    ...(isWindows && useShell ? { windowsHide: true } : {}),
   };
-
-  // On Windows, detached processes need shell:true to work correctly
-  if (isWindows) {
-    opts.shell = true;
-    opts.windowsHide = true;
-  }
 
   const child = spawn(cmd, args, opts);
   child.unref();
   return child;
-}
-
-function getNpxCmd(): string {
-  return isWindows ? 'npx.cmd' : 'npx';
 }
 
 export const startCommand = new Command('start')
@@ -57,13 +49,18 @@ export const startCommand = new Command('start')
       console.log('Starting RaceGuard UI on port 3000...');
       const uiPath = path.resolve(__dirname, '../../../ui');
 
-      spawnBackground(getNpxCmd(), ['next', 'dev'], uiPath);
+      if (isWindows) {
+        // On Windows, use cmd /c to run npx next dev — avoids spawn ENOENT with npx.cmd
+        spawnBackground('cmd', ['/c', 'npx next dev'], uiPath, true);
+      } else {
+        spawnBackground('npx', ['next', 'dev'], uiPath);
+      }
 
       setTimeout(() => {
         const url = 'http://localhost:3000';
         console.log(`Opening dashboard: ${url}`);
         if (isWindows) {
-          spawnBackground('explorer', [url]);
+          spawnBackground('cmd', ['/c', 'start', url], undefined, true);
         } else if (process.platform === 'darwin') {
           spawnBackground('open', [url]);
         } else {
