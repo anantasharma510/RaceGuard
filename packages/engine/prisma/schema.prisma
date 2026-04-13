@@ -1,0 +1,59 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model TestRun {
+  id            String         @id @default(cuid())
+  type          String
+  endpoint      String
+  method        String
+  body          String?
+  concurrency   Int
+  totalRequests Int
+  invariantRule String?
+  status        String         @default("running")
+  summary       String?
+  createdAt     DateTime       @default(now())
+  completedAt   DateTime?
+  requestEvents RequestEvent[]
+  reproducer    Reproducer?
+}
+
+model RequestEvent {
+  id             String          @id @default(cuid())
+  testRunId      String
+  requestNumber  Int
+  payload        String?
+  statusCode     Int?
+  responseBody   String?
+  latencyMs      Int?
+  isViolation    Boolean         @default(false)
+  timestamp      DateTime        @default(now())
+  testRun        TestRun         @relation(fields: [testRunId], references: [id])
+  invariantCheck InvariantCheck?
+}
+
+model InvariantCheck {
+  id             String       @id @default(cuid())
+  testRunId      String
+  requestEventId String       @unique
+  rule           String
+  actualValue    String?
+  passed         Boolean
+  timestamp      DateTime     @default(now())
+  requestEvent   RequestEvent @relation(fields: [requestEventId], references: [id])
+}
+
+model Reproducer {
+  id        String   @id @default(cuid())
+  testRunId String   @unique
+  code      String
+  framework String
+  createdAt DateTime @default(now())
+  testRun   TestRun  @relation(fields: [testRunId], references: [id])
+}

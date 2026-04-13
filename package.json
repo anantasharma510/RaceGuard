@@ -1,0 +1,17 @@
+{
+  "name": "raceguard",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint"
+  },
+  "devDependencies": {
+    "ts-node": "^10.9.0",
+    "turbo": "latest",
+    "typescript": "^5.0.0"
+  }
+}
