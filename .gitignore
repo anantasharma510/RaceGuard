@@ -48,3 +48,6 @@ coverage/
 # Misc
 *.tsbuildinfo
 raceguard.reproduce.test.js
+
+# Internal docs
+system-design.md
