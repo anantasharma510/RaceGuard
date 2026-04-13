@@ -1,13 +1,47 @@
 {
-  "name": "@raceguard/cli",
+  "name": "@ananta_sharma/raceguard",
   "version": "0.1.0",
+  "description": "Prove your API handles concurrent requests correctly. Catch race conditions before production.",
   "main": "dist/index.js",
   "bin": {
     "raceguard": "dist/index.js"
   },
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "build:full": "cd ../engine && npm run build && cd ../cli && npm run build && node scripts/copy-engine.js",
+    "copy-engine": "node scripts/copy-engine.js",
+    "start": "node dist/index.js",
+    "prepublishOnly": "npm run build"
   },
+  "keywords": [
+    "testing",
+    "concurrency",
+    "race-conditions",
+    "api-testing",
+    "developer-tools",
+    "nestjs",
+    "idempotency",
+    "invariant",
+    "cli"
+  ],
+  "author": "Ananta Sharma <anantasharma510@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/anantasharma510/RaceGuard.git"
+  },
+  "homepage": "https://github.com/anantasharma510/RaceGuard#readme",
+  "bugs": {
+    "url": "https://github.com/anantasharma510/RaceGuard/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist/",
+    "scripts/",
+    "README.md"
+  ],
   "dependencies": {
     "commander": "^12.0.0",
     "axios": "^1.6.0"

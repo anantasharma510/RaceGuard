@@ -51,3 +51,7 @@ raceguard.reproduce.test.js
 
 # Internal docs
 system-design.md
+
+# npm auth
+.npmrc
+packages/cli/.npmrc

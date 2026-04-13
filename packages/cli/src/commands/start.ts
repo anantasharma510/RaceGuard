@@ -13,9 +13,15 @@ export const startCommand = new Command('start')
     const engineDist = path.resolve(__dirname, '../../../engine/dist/main.js');
     const tsNodeBin = path.resolve(__dirname, '../../../engine/node_modules/.bin/ts-node');
 
-    const useCompiled = fs.existsSync(engineDist);
+    // When bundled (published), engine is at dist/engine/main.js
+    const bundledEngine = path.resolve(__dirname, '../engine/main.js');
+    const useCompiled = fs.existsSync(bundledEngine)
+      ? bundledEngine
+      : fs.existsSync(engineDist)
+        ? engineDist
+        : null;
     const engine = useCompiled
-      ? spawn('node', [engineDist], { stdio: 'ignore', detached: true, shell: true })
+      ? spawn('node', [useCompiled], { stdio: 'ignore', detached: true, shell: true })
       : spawn(tsNodeBin, [engineSrc], { stdio: 'ignore', detached: true, shell: true });
 
     engine.unref();
