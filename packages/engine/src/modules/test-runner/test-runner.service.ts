@@ -13,6 +13,28 @@ import {
 
 const IDEMPOTENCY_CONCURRENCY = 10;
 
+/**
+ * Builds request headers for a given request index.
+ * If userTokens is provided, cycles through them round-robin so each
+ * request simulates a different user. This is the correct way to test
+ * race conditions across multiple users with JWT auth.
+ *
+ * Example: 50 requests with 5 tokens → each token used 10 times,
+ * simulating 5 concurrent users each sending 10 requests.
+ */
+function buildHeaders(
+  index: number,
+  staticHeaders?: Record<string, string>,
+  userTokens?: string[],
+): Record<string, string> {
+  const headers: Record<string, string> = { ...staticHeaders };
+  if (userTokens && userTokens.length > 0) {
+    const token = userTokens[index % userTokens.length];
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
 @Injectable()
 export class TestRunnerService {
   private readonly logger = new Logger(TestRunnerService.name);
@@ -36,28 +58,16 @@ export class TestRunnerService {
       totalRequests: config.totalRequests,
     });
 
-    this.gateway.emitTestStarted({
-      testRunId: testRun.id,
-      type: 'idempotency',
-      endpoint: config.endpoint,
-      totalRequests: config.totalRequests,
-    });
+    this.gateway.emitTestStarted({ testRunId: testRun.id, type: 'idempotency', endpoint: config.endpoint, totalRequests: config.totalRequests });
 
     const tasks = Array.from({ length: config.totalRequests }, (_, i) => ({
       execute: async () => {
         const start = Date.now();
+        const headers = buildHeaders(i, config.headers, config.userTokens);
         try {
-          const response = await axios({ method: config.method, url: config.endpoint, data: config.body });
+          const response = await axios({ method: config.method, url: config.endpoint, data: config.body, headers });
           const latencyMs = Date.now() - start;
-          await this.eventStore.createRequestEvent({
-            testRunId: testRun.id,
-            requestNumber: i + 1,
-            payload: JSON.stringify(config.body),
-            statusCode: response.status,
-            responseBody: JSON.stringify(response.data),
-            latencyMs,
-            isViolation: false,
-          });
+          await this.eventStore.createRequestEvent({ testRunId: testRun.id, requestNumber: i + 1, payload: JSON.stringify(config.body), statusCode: response.status, responseBody: JSON.stringify(response.data), latencyMs, isViolation: false });
           this.gateway.emitRequestCompleted({ testRunId: testRun.id, requestNumber: i + 1, statusCode: response.status, latencyMs, isViolation: false });
           return { status: response.status, body: JSON.stringify(response.data), latencyMs };
         } catch (err: any) {
@@ -110,8 +120,9 @@ export class TestRunnerService {
     const tasks = Array.from({ length: config.totalRequests }, (_, i) => ({
       execute: async () => {
         const start = Date.now();
+        const headers = buildHeaders(i, config.headers, config.userTokens);
         try {
-          const response = await axios({ method: config.method, url: config.endpoint, data: config.body });
+          const response = await axios({ method: config.method, url: config.endpoint, data: config.body, headers });
           const latencyMs = Date.now() - start;
 
           let passed = true;
@@ -172,7 +183,8 @@ export class TestRunnerService {
       execute: async () => {
         await new Promise((r) => setTimeout(r, 50));
         const start = Date.now();
-        const response = await axios({ method: config.method, url: config.endpoint });
+        const headers = buildHeaders(i, config.headers, config.userTokens);
+        const response = await axios({ method: config.method, url: config.endpoint, headers });
         const latencyMs = Date.now() - start;
         await this.eventStore.createRequestEvent({ testRunId: testRun.id, requestNumber: i + 1, statusCode: response.status, responseBody: JSON.stringify(response.data), latencyMs, isViolation: false });
         this.gateway.emitRequestCompleted({ testRunId: testRun.id, requestNumber: i + 1, statusCode: response.status, latencyMs, isViolation: false });

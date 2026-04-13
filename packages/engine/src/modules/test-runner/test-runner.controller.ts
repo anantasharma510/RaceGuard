@@ -19,6 +19,8 @@ export class TestRunnerController {
       endpoint: dto.endpoint,
       body: dto.body,
       totalRequests: dto.totalRequests ?? 20,
+      headers: dto.headers,
+      userTokens: dto.userTokens,
     });
   }
 
@@ -31,6 +33,8 @@ export class TestRunnerController {
       concurrency: dto.concurrency ?? 10,
       totalRequests: dto.totalRequests ?? 50,
       invariantRule: dto.invariantRule,
+      headers: dto.headers,
+      userTokens: dto.userTokens,
     });
   }
 
@@ -40,6 +44,8 @@ export class TestRunnerController {
       method: dto.method,
       endpoint: dto.endpoint,
       totalRequests: dto.totalRequests ?? 100,
+      headers: dto.headers,
+      userTokens: dto.userTokens,
     });
   }
 
