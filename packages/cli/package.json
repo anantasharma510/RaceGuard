@@ -1,6 +1,6 @@
 {
   "name": "raceguard-cli",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Prove your API handles concurrent requests correctly. Catch race conditions before production.",
   "main": "dist/index.js",
   "bin": {
@@ -35,7 +35,6 @@
   },
   "files": [
     "dist/",
-    "scripts/",
     "README.md"
   ],
   "dependencies": {

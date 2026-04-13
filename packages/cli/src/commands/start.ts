@@ -1,7 +1,31 @@
 import { Command } from 'commander';
-import { spawn } from 'child_process';
+import { spawn, SpawnOptions } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
+
+const isWindows = process.platform === 'win32';
+
+function spawnBackground(cmd: string, args: string[], cwd?: string) {
+  const opts: SpawnOptions = {
+    stdio: 'ignore',
+    detached: true,
+    cwd,
+  };
+
+  // On Windows, detached processes need shell:true to work correctly
+  if (isWindows) {
+    opts.shell = true;
+    opts.windowsHide = true;
+  }
+
+  const child = spawn(cmd, args, opts);
+  child.unref();
+  return child;
+}
+
+function getNpxCmd(): string {
+  return isWindows ? 'npx.cmd' : 'npx';
+}
 
 export const startCommand = new Command('start')
   .description('Start the RaceGuard engine (and optionally the UI)')
@@ -13,44 +37,38 @@ export const startCommand = new Command('start')
 
     const engineSrc = path.resolve(__dirname, '../../../engine/src/main.ts');
     const engineDist = path.resolve(__dirname, '../../../engine/dist/main.js');
-    const tsNodeBin = path.resolve(__dirname, '../../../engine/node_modules/.bin/ts-node');
-
-    // When bundled (published), engine is at dist/engine/main.js
     const bundledEngine = path.resolve(__dirname, '../engine/main.js');
-    const useCompiled = fs.existsSync(bundledEngine)
-      ? bundledEngine
-      : fs.existsSync(engineDist)
-        ? engineDist
-        : null;
-    const engine = useCompiled
-      ? spawn('node', [useCompiled], { stdio: 'ignore', detached: true, shell: true })
-      : spawn(tsNodeBin, [engineSrc], { stdio: 'ignore', detached: true, shell: true });
 
-    engine.unref();
+    if (fs.existsSync(bundledEngine)) {
+      spawnBackground(process.execPath, [bundledEngine]);
+    } else if (fs.existsSync(engineDist)) {
+      spawnBackground(process.execPath, [engineDist]);
+    } else {
+      const tsNodeBin = path.resolve(__dirname, '../../../engine/node_modules/.bin/ts-node');
+      const tsNodeExe = isWindows ? tsNodeBin + '.cmd' : tsNodeBin;
+      spawnBackground(tsNodeExe, [engineSrc]);
+    }
 
-    // Wait a moment then verify engine started
     setTimeout(() => {
       console.log('Engine started on http://localhost:7842');
-      console.log('Status: http://localhost:7842');
     }, 1500);
 
     if (options.ui) {
       console.log('Starting RaceGuard UI on port 3000...');
       const uiPath = path.resolve(__dirname, '../../../ui');
-      const ui = spawn('npx', ['next', 'dev'], {
-        cwd: uiPath,
-        stdio: 'ignore',
-        detached: true,
-        shell: true,
-      });
-      ui.unref();
 
-      // Open browser after UI starts
+      spawnBackground(getNpxCmd(), ['next', 'dev'], uiPath);
+
       setTimeout(() => {
         const url = 'http://localhost:3000';
         console.log(`Opening dashboard: ${url}`);
-        const open = process.platform === 'win32' ? 'start' : process.platform === 'darwin' ? 'open' : 'xdg-open';
-        spawn(open, [url], { shell: true, stdio: 'ignore' }).unref();
-      }, 3000);
+        if (isWindows) {
+          spawnBackground('explorer', [url]);
+        } else if (process.platform === 'darwin') {
+          spawnBackground('open', [url]);
+        } else {
+          spawnBackground('xdg-open', [url]);
+        }
+      }, 4000);
     }
   });

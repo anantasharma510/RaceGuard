@@ -4,6 +4,7 @@ import { idempotencyCommand } from './commands/idempotency';
 import { invariantCommand } from './commands/invariant';
 import { flakyCommand } from './commands/flaky';
 import { startCommand } from './commands/start';
+import { stopCommand } from './commands/stop';
 
 const program = new Command();
 
@@ -13,6 +14,7 @@ program
   .version('1.0.0');
 
 program.addCommand(startCommand);
+program.addCommand(stopCommand);
 program.addCommand(idempotencyCommand);
 program.addCommand(invariantCommand);
 program.addCommand(flakyCommand);

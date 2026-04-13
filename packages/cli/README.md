@@ -79,6 +79,13 @@ No installation required. No Docker. No database setup.
 npx raceguard-cli start
 ```
 
+**Stop the engine:**
+```bash
+npx raceguard-cli stop
+```
+
+Kills the engine process running on port 7842. Run this when you're done testing.
+
 **Idempotency test:**
 ```bash
 npx raceguard-cli idempotency POST http://localhost:3000/api/orders \
