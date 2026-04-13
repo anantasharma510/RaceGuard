@@ -8,6 +8,8 @@ export const startCommand = new Command('start')
   .option('--ui', 'Also launch the Next.js dashboard and open browser')
   .action((options) => {
     console.log('Starting RaceGuard engine on port 7842...');
+    console.log('\x1b[33m⚠  USE AT YOUR OWN RISK — experimental tool, may contain bugs.\x1b[0m');
+    console.log('\x1b[33m   Only test APIs you own. Author accepts no liability.\x1b[0m\n');
 
     const engineSrc = path.resolve(__dirname, '../../../engine/src/main.ts');
     const engineDist = path.resolve(__dirname, '../../../engine/dist/main.js');

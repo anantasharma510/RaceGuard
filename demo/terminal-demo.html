@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RaceGuard Demo</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #07070a;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 40px 20px;
+    font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  }
+
+  .hero {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .hero h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    letter-spacing: -0.5px;
+  }
+  .hero p {
+    color: #666;
+    font-size: 15px;
+    margin-top: 8px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  .hero span { color: #7c6af7; }
+
+  .terminal {
+    width: 100%;
+    max-width: 680px;
+    background: #0e0e10;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid #2a2a2e;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+  }
+
+  .titlebar {
+    background: #1a1a1e;
+    padding: 11px 16px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    border-bottom: 1px solid #2a2a2e;
+  }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot-r { background: #ff5f57; }
+  .dot-y { background: #ffbd2e; }
+  .dot-g { background: #28c840; }
+  .title-text {
+    margin-left: 8px;
+    font-size: 12px;
+    color: #555;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  .body {
+    padding: 20px 22px 24px;
+    min-height: 420px;
+    font-size: 13px;
+    line-height: 1.75;
+  }
+
+  .line { display: flex; white-space: pre; }
+  .prompt { color: #7c6af7; }
+  .cmd { color: #e8e8e8; }
+  .dim { color: #555; }
+  .green { color: #28c840; }
+  .red { color: #ff5f57; }
+  .yellow { color: #ffbd2e; }
+  .cyan { color: #5ac8fa; }
+  .white { color: #e8e8e8; }
+  .purple { color: #7c6af7; font-weight: 600; }
+
+  .cursor {
+    display: inline-block;
+    width: 8px;
+    height: 14px;
+    background: #7c6af7;
+    vertical-align: middle;
+    animation: blink 1s step-end infinite;
+  }
+
+  .progress-wrap {
+    background: #1e1e22;
+    border-radius: 3px;
+    height: 6px;
+    overflow: hidden;
+    display: inline-block;
+    width: 180px;
+    vertical-align: middle;
+    margin: 0 8px;
+  }
+  .progress-bar {
+    height: 100%;
+    border-radius: 3px;
+    background: #7c6af7;
+    transition: width 0.08s linear;
+  }
+  .progress-bar.violated { background: #ff5f57; }
+  .progress-bar.done { background: #28c840; }
+
+  .violation-box {
+    background: #150808;
+    border: 1px solid #4a1515;
+    border-radius: 8px;
+    padding: 13px 16px;
+    margin: 6px 0 4px;
+  }
+  .reproducer-box {
+    background: #080f08;
+    border: 1px solid #1a3d1a;
+    border-radius: 8px;
+    padding: 13px 16px;
+    margin: 4px 0;
+  }
+
+  .replay-btn {
+    margin-top: 16px;
+    padding: 7px 18px;
+    background: #1a1a1e;
+    border: 1px solid #333;
+    border-radius: 8px;
+    color: #666;
+    font-size: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .replay-btn:hover { background: #252528; color: #aaa; border-color: #444; }
+
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(3px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes slideUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+
+  .fade { animation: fadeIn 0.25s ease forwards; }
+  .slide { animation: slideUp 0.35s ease forwards; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>RaceGuard</h1>
+  <p>Catch <span>race conditions</span> before your users do.</p>
+</div>
+
+<div class="terminal">
+  <div class="titlebar">
+    <div class="dot dot-r"></div>
+    <div class="dot dot-y"></div>
+    <div class="dot dot-g"></div>
+    <span class="title-text">zsh — raceguard</span>
+  </div>
+  <div class="body" id="term-body">
+    <div class="line">
+      <span class="prompt">~ </span>
+      <span class="cmd" id="typing-cmd"></span>
+      <span class="cursor" id="cursor"></span>
+    </div>
+  </div>
+</div>
+
+<button class="replay-btn" onclick="startAnimation()">↺ replay</button>
+
+<script>
+const body = document.getElementById('term-body');
+
+function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function addLine(html, delay = 0) {
+  return new Promise(async r => {
+    await wait(delay);
+    const d = document.createElement('div');
+    d.className = 'line fade';
+    d.innerHTML = html;
+    body.appendChild(d);
+    r();
+  });
+}
+
+function addBlock(html, delay = 0) {
+  return new Promise(async r => {
+    await wait(delay);
+    const d = document.createElement('div');
+    d.className = 'slide';
+    d.innerHTML = html;
+    body.appendChild(d);
+    r();
+  });
+}
+
+async function typeCommand(text) {
+  const tc = document.getElementById('typing-cmd');
+  const cur = document.getElementById('cursor');
+  tc.textContent = '';
+  cur.style.display = 'inline-block';
+  for (const c of text) {
+    tc.textContent += c;
+    await wait(36 + Math.random() * 28);
+  }
+  await wait(300);
+  cur.style.display = 'none';
+}
+
+async function animateProgress() {
+  const bar = document.getElementById('prog-bar');
+  const count = document.getElementById('prog-count');
+  const pct = document.getElementById('prog-pct');
+  const total = 50;
+  let violated = false;
+
+  for (let i = 1; i <= total; i++) {
+    await wait(i < 15 ? 55 : i < 35 ? 40 : 28);
+    const w = Math.round((i / total) * 100);
+    bar.style.width = w + '%';
+    count.textContent = i + '/' + total;
+    pct.textContent = w + '%';
+
+    if (i === 23 && !violated) {
+      violated = true;
+      bar.classList.add('violated');
+    }
+  }
+}
+
+async function startAnimation() {
+  body.innerHTML = `
+    <div class="line">
+      <span class="prompt">~ </span>
+      <span class="cmd" id="typing-cmd"></span>
+      <span class="cursor" id="cursor"></span>
+    </div>`;
+
+  await typeCommand('npx raceguard-cli invariant --config raceguard.config.js');
+
+  await addLine('<span class="dim">  loading config...</span>', 200);
+  await addLine('', 80);
+  await addLine('<span class="purple">  RaceGuard</span><span class="dim"> v0.1.1  —  invariant test</span>', 300);
+  await addLine('', 40);
+  await addLine('<span class="dim">  endpoint    </span><span class="cyan">POST http://localhost:3000/api/products/buy</span>', 100);
+  await addLine('<span class="dim">  concurrency </span><span class="white">20</span><span class="dim">  (max 50)</span>', 70);
+  await addLine('<span class="dim">  requests    </span><span class="white">50</span>', 70);
+  await addLine('<span class="dim">  invariant   </span><span class="white">response.data.remainingStock >= 0</span>', 70);
+  await addLine('', 100);
+  await addLine('<span class="dim">  firing requests...</span>', 300);
+  await addLine('', 60);
+
+  const progLine = document.createElement('div');
+  progLine.className = 'line fade';
+  progLine.innerHTML = `
+    <span class="dim">  </span>
+    <div class="progress-wrap">
+      <div class="progress-bar" id="prog-bar" style="width:0%"></div>
+    </div>
+    <span class="dim" id="prog-count" style="margin-left:8px">0/50</span>
+    <span class="dim" id="prog-pct" style="margin-left:6px">0%</span>`;
+  body.appendChild(progLine);
+
+  await animateProgress();
+
+  await addLine('', 200);
+  await addLine('<span class="dim">  passed   </span><span class="green">48</span><span class="dim">   violated  </span><span class="red">2</span><span class="dim">   avg latency  </span><span class="white">84ms</span>', 300);
+  await addLine('', 80);
+
+  await addBlock(`
+    <div class="violation-box">
+      <div class="line" style="margin-bottom:6px">
+        <span class="red" style="font-weight:600">  ⚠  RACE CONDITION DETECTED</span>
+        <span class="dim">  requests #23 and #24</span>
+      </div>
+      <div class="line"><span class="dim">    both read   </span><span class="yellow">remainingStock = 1</span></div>
+      <div class="line"><span class="dim">    both wrote  </span><span class="yellow">remainingStock = 0</span></div>
+      <div class="line"><span class="dim">    final value </span><span class="red">remainingStock = -1</span><span class="dim">  ← invariant violated</span></div>
+      <div class="line" style="margin-top:6px">
+        <span class="dim">    overlap     </span><span class="white">2ms</span>
+        <span class="dim">   req #23  </span><span class="white">81ms</span>
+        <span class="dim">   req #24  </span><span class="white">83ms</span>
+      </div>
+    </div>`, 400);
+
+  await addBlock(`
+    <div class="reproducer-box">
+      <div class="line" style="margin-bottom:4px">
+        <span class="green" style="font-weight:600">  ✓  reproducer saved</span>
+      </div>
+      <div class="line"><span class="dim">    </span><span class="cyan">./raceguard.reproduce.test.js</span></div>
+      <div class="line"><span class="dim">    jest / vitest compatible</span></div>
+    </div>`, 500);
+
+  await addLine('', 100);
+  await addLine('<span class="dim">  run </span><span class="cyan">npx raceguard-cli start --ui</span><span class="dim"> to inspect the full timeline</span>', 400);
+  await addLine('', 200);
+
+  const promptLine = document.createElement('div');
+  promptLine.className = 'line fade';
+  promptLine.innerHTML = `<span class="prompt">~ </span><span class="cursor"></span>`;
+  body.appendChild(promptLine);
+}
+
+startAnimation();
+</script>
+</body>
+</html>

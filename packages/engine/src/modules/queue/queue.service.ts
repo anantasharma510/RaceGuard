@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { QueueTask, QueueProgress, ProgressCallback } from './queue.type';
 
-const MAX_CONCURRENCY = 500;
+const MAX_CONCURRENCY = 50;
 const WARN_TOTAL = 10000;
 
 @Injectable()

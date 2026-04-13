@@ -12,7 +12,6 @@ import {
 } from './test-runner.types';
 
 const IDEMPOTENCY_CONCURRENCY = 10;
-
 /**
  * Builds request headers for a given request index.
  * If userTokens is provided, cycles through them round-robin so each
