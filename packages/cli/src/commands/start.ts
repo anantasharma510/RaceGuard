@@ -1,37 +1,48 @@
 import { Command } from 'commander';
 import { spawn } from 'child_process';
 import * as path from 'path';
+import * as fs from 'fs';
 
 export const startCommand = new Command('start')
   .description('Start the RaceGuard engine (and optionally the UI)')
-  .option('--ui', 'Also launch the Next.js dashboard')
+  .option('--ui', 'Also launch the Next.js dashboard and open browser')
   .action((options) => {
     console.log('Starting RaceGuard engine on port 7842...');
 
-    // Use ts-node in dev, compiled dist in production
     const engineSrc = path.resolve(__dirname, '../../../engine/src/main.ts');
     const engineDist = path.resolve(__dirname, '../../../engine/dist/main.js');
     const tsNodeBin = path.resolve(__dirname, '../../../engine/node_modules/.bin/ts-node');
 
-    const useCompiled = require('fs').existsSync(engineDist);
+    const useCompiled = fs.existsSync(engineDist);
     const engine = useCompiled
       ? spawn('node', [engineDist], { stdio: 'ignore', detached: true, shell: true })
       : spawn(tsNodeBin, [engineSrc], { stdio: 'ignore', detached: true, shell: true });
 
     engine.unref();
-    console.log('Engine started in background. Logs suppressed.');
-    console.log('Hit http://localhost:7842 to verify it is running.');
+
+    // Wait a moment then verify engine started
+    setTimeout(() => {
+      console.log('Engine started on http://localhost:7842');
+      console.log('Status: http://localhost:7842');
+    }, 1500);
 
     if (options.ui) {
-      console.log('Starting RaceGuard UI on port 7843...');
-      const ui = spawn('npx', ['next', 'start', '-p', '7843'], {
-        cwd: path.resolve(__dirname, '../../../ui'),
-        stdio: 'inherit',
+      console.log('Starting RaceGuard UI on port 3000...');
+      const uiPath = path.resolve(__dirname, '../../../ui');
+      const ui = spawn('npx', ['next', 'dev'], {
+        cwd: uiPath,
+        stdio: 'ignore',
+        detached: true,
         shell: true,
       });
+      ui.unref();
 
-      ui.on('error', (err) => {
-        console.error('Failed to start UI:', err.message);
-      });
+      // Open browser after UI starts
+      setTimeout(() => {
+        const url = 'http://localhost:3000';
+        console.log(`Opening dashboard: ${url}`);
+        const open = process.platform === 'win32' ? 'start' : process.platform === 'darwin' ? 'open' : 'xdg-open';
+        spawn(open, [url], { shell: true, stdio: 'ignore' }).unref();
+      }, 3000);
     }
   });

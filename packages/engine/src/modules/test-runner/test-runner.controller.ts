@@ -63,4 +63,9 @@ export class TestRunnerController {
   getViolations(@Param('id') id: string) {
     return this.eventStore.getViolationsForRun(id);
   }
+
+  @Get(':id/events')
+  getRequestEvents(@Param('id') id: string) {
+    return this.eventStore.getRequestEventsForRun(id);
+  }
 }

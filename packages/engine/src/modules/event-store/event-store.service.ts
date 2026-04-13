@@ -85,4 +85,16 @@ export class EventStoreService {
       throw new Error(`Failed to get violations: ${(err as Error).message}`);
     }
   }
+
+  async getRequestEventsForRun(testRunId: string) {
+    try {
+      return await this.prisma.db.requestEvent.findMany({
+        where: { testRunId },
+        orderBy: { requestNumber: 'asc' },
+        include: { invariantCheck: true },
+      });
+    } catch (err) {
+      throw new Error(`Failed to get request events: ${(err as Error).message}`);
+    }
+  }
 }
