@@ -10,7 +10,7 @@ const program = new Command();
 program
   .name('raceguard')
   .description('Prove your API handles concurrent requests correctly.\n\n  ⚠  USE AT YOUR OWN RISK — experimental tool built as a personal learning project.\n     May contain bugs. Only test APIs you own. Author accepts no liability.')
-  .version('0.1.1');
+  .version('1.0.0');
 
 program.addCommand(startCommand);
 program.addCommand(idempotencyCommand);
