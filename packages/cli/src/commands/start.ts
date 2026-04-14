@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as https from 'https';
+import * as http from 'http';
 
 const isWindows = process.platform === 'win32';
 
@@ -30,14 +31,14 @@ function downloadComposeFile(): Promise<void> {
     https.get(COMPOSE_URL, (res) => {
       if (res.statusCode !== 200) {
         dest.close();
-        fs.unlinkSync(tmp);
+        if (fs.existsSync(tmp)) fs.unlinkSync(tmp);
         reject(new Error(`HTTP ${res.statusCode}`));
         return;
       }
       res.pipe(dest);
       dest.on('finish', () => {
         dest.close();
-        fs.renameSync(tmp, file); // atomic replace
+        fs.renameSync(tmp, file);
         resolve();
       });
     }).on('error', (err) => {
@@ -53,7 +54,6 @@ function ensureComposeFile(): Promise<string> {
   return downloadComposeFile()
     .then(() => file)
     .catch((err) => {
-      // If download fails but we have a cached copy, use it
       if (fs.existsSync(file)) {
         console.log('\x1b[33m⚠  Could not download latest config (offline?), using cached version.\x1b[0m');
         return file;
@@ -71,7 +71,6 @@ function checkDocker(): boolean {
   }
 }
 
-// Support both `docker compose` (v2) and `docker-compose` (v1)
 function getDockerComposeCmd(): string {
   try {
     execSync('docker compose version', { stdio: 'ignore' });
@@ -81,7 +80,7 @@ function getDockerComposeCmd(): string {
       execSync('docker-compose --version', { stdio: 'ignore' });
       return 'docker-compose';
     } catch {
-      return 'docker compose'; // default, will fail with a clear error
+      return 'docker compose';
     }
   }
 }
@@ -89,7 +88,6 @@ function getDockerComposeCmd(): string {
 function openBrowser(url: string) {
   try {
     if (isWindows) {
-      // 'start' is a cmd built-in, must use cmd /c
       execFileSync('cmd', ['/c', 'start', url], { stdio: 'ignore' });
     } else if (process.platform === 'darwin') {
       execFileSync('open', [url], { stdio: 'ignore' });
@@ -97,9 +95,36 @@ function openBrowser(url: string) {
       execFileSync('xdg-open', [url], { stdio: 'ignore' });
     }
   } catch {
-    // Non-fatal — just print the URL
     console.log(`   Open manually: ${url}`);
   }
+}
+
+// Poll until the engine HTTP endpoint responds, then resolve
+function waitForReady(timeoutMs = 60000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    let dots = 0;
+
+    const interval = setInterval(() => {
+      http.get('http://localhost:7842', (res) => {
+        res.resume(); // drain response
+        if (res.statusCode && res.statusCode < 500) {
+          clearInterval(interval);
+          process.stdout.write('\n');
+          resolve();
+        }
+      }).on('error', () => {
+        if (Date.now() - start > timeoutMs) {
+          clearInterval(interval);
+          process.stdout.write('\n');
+          reject(new Error('Timed out waiting for RaceGuard to start'));
+        } else {
+          dots++;
+          if (dots % 3 === 0) process.stdout.write('.');
+        }
+      });
+    }, 1000);
+  });
 }
 
 export const startCommand = new Command('start')
@@ -141,11 +166,20 @@ export const startCommand = new Command('start')
       process.exit(1);
     }
 
-    console.log('\n\x1b[32m✓  RaceGuard started.\x1b[0m');
+    process.stdout.write('Waiting for services to be ready');
+    try {
+      await waitForReady();
+    } catch (err: any) {
+      console.error(`\x1b[31m✗  ${err.message}\x1b[0m`);
+      console.error('   Try: docker logs raceguard');
+      process.exit(1);
+    }
+
+    console.log('\n\x1b[32m✓  RaceGuard is ready.\x1b[0m');
     console.log('   Engine:    http://localhost:7842');
     console.log('   Dashboard: http://localhost:3004\n');
 
     if (options.ui) {
-      setTimeout(() => openBrowser('http://localhost:3004'), 3000);
+      openBrowser('http://localhost:3004');
     }
   });

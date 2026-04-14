@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import axios from 'axios';
 import * as fs from 'fs';
 import * as path from 'path';
-import { printSummary, printError } from '../utils/output';
+import { printSummary, printError, normalizeEndpoint } from '../utils/output';
 export const invariantCommand = new Command('invariant')
   .description('Test an endpoint with a concurrency invariant rule')
   .option('-c, --config <path>', 'Path to raceguard.config.js', 'raceguard.config.js')
@@ -17,6 +17,7 @@ export const invariantCommand = new Command('invariant')
 
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const config = require(configPath);
+    const endpoint = normalizeEndpoint(config.endpoint);
 
     console.log(`\nTesting invariant: ${config.method?.toUpperCase()} ${config.endpoint}\n`);
     if (config.userTokens?.length) console.log(`Simulating ${config.userTokens.length} users\n`);
@@ -24,7 +25,7 @@ export const invariantCommand = new Command('invariant')
     try {
       const response = await axios.post('http://localhost:7842/api/tests/invariant', {
         method: config.method?.toUpperCase(),
-        endpoint: config.endpoint,
+        endpoint,
         body: config.body,
         concurrency: config.concurrency ?? 10,
         totalRequests: config.totalRequests ?? 50,

@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import axios from 'axios';
-import { printSummary, printError } from '../utils/output';
+import { printSummary, printError, normalizeEndpoint } from '../utils/output';
 
 export const idempotencyCommand = new Command('idempotency')
   .description('Test whether an endpoint is idempotent')
@@ -15,6 +15,7 @@ export const idempotencyCommand = new Command('idempotency')
     const body = options.body ? JSON.parse(options.body) : undefined;
     const headers = options.header ? JSON.parse(options.header) : undefined;
     const userTokens = options.tokens ? options.tokens.split(',').map((t: string) => t.trim()) : undefined;
+    const endpoint = normalizeEndpoint(url);
 
     console.log(`\nTesting idempotency: ${method.toUpperCase()} ${url} (${times}x)\n`);
     if (userTokens) console.log(`Simulating ${userTokens.length} users (round-robin tokens)\n`);
@@ -22,7 +23,7 @@ export const idempotencyCommand = new Command('idempotency')
     try {
       const response = await axios.post('http://localhost:7842/api/tests/idempotency', {
         method: method.toUpperCase(),
-        endpoint: url,
+        endpoint,
         body,
         totalRequests: times,
         headers,

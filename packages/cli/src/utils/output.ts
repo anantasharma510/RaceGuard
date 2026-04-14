@@ -30,3 +30,12 @@ export function printSummary(data: any): void {
 export function printError(message: string): void {
   console.error(`\x1b[31mError: ${message}\x1b[0m`);
 }
+
+/**
+ * Rewrites localhost URLs to host.docker.internal so the engine
+ * (running inside Docker) can reach services on the host machine.
+ * Users can write localhost:3000 naturally — this handles it transparently.
+ */
+export function normalizeEndpoint(url: string): string {
+  return url.replace(/localhost/g, 'host.docker.internal');
+}

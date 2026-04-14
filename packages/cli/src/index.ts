@@ -11,7 +11,7 @@ const program = new Command();
 program
   .name('raceguard')
   .description('Prove your API handles concurrent requests correctly.\n\n  ⚠  USE AT YOUR OWN RISK — experimental tool built as a personal learning project.\n     May contain bugs. Only test APIs you own. Author accepts no liability.')
-  .version('1.0.6');
+  .version('1.0.8');
 
 program.addCommand(startCommand);
 program.addCommand(stopCommand);

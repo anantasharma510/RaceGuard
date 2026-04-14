@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import axios from 'axios';
-import { printSummary, printError } from '../utils/output';
+import { printSummary, printError, normalizeEndpoint } from '../utils/output';
 
 export const flakyCommand = new Command('flaky')
   .description('Detect flakiness in an endpoint by running it repeatedly')
@@ -13,13 +13,14 @@ export const flakyCommand = new Command('flaky')
     const times = parseInt(options.times, 10);
     const headers = options.header ? JSON.parse(options.header) : undefined;
     const userTokens = options.tokens ? options.tokens.split(',').map((t: string) => t.trim()) : undefined;
+    const endpoint = normalizeEndpoint(url);
 
     console.log(`\nDetecting flakiness: ${method.toUpperCase()} ${url} (${times}x)\n`);
 
     try {
       const response = await axios.post('http://localhost:7842/api/tests/flaky', {
         method: method.toUpperCase(),
-        endpoint: url,
+        endpoint,
         totalRequests: times,
         headers,
         userTokens,
