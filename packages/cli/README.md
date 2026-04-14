@@ -62,29 +62,42 @@ Use when your API:
 
 ---
 
+## Requirements
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop) must be installed and running.
+- Node.js 18+ (for the CLI only)
+
+---
+
 ## Install
 
 ```bash
 npx raceguard-cli start
 ```
 
-No installation required. No Docker. No database setup.
+Pulls the latest Docker images and starts the engine + dashboard automatically.
 
 ---
 
 ## Usage
 
-**Start the engine:**
+**Start (engine + dashboard):**
 ```bash
 npx raceguard-cli start
 ```
 
-**Stop the engine:**
+**Start and open dashboard in browser:**
+```bash
+npx raceguard-cli start --ui
+```
+
+**Stop everything:**
 ```bash
 npx raceguard-cli stop
 ```
 
-Kills the engine process running on port 7842. Run this when you're done testing.
+- Engine runs on `http://localhost:7842`
+- Dashboard runs on `http://localhost:3004`
 
 **Idempotency test:**
 ```bash
@@ -134,7 +147,7 @@ module.exports = {
 npx raceguard-cli start --ui
 ```
 
-Opens `http://localhost:3000` with real-time request timeline, history, and reproducer files.
+Opens `http://localhost:3004` with real-time request timeline, history, and reproducer files.
 
 ---
 

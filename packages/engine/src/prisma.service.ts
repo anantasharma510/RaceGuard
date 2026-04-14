@@ -8,7 +8,20 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   private client: PrismaClient;
 
   constructor() {
-    const dbPath = path.resolve(__dirname, '../prisma/dev.db');
+    // Use DATABASE_URL env var if set (Docker), otherwise fall back to local dev path
+    const dbUrl = process.env.DATABASE_URL;
+    let dbPath: string;
+
+    if (dbUrl && dbUrl.startsWith('file:')) {
+      dbPath = dbUrl.replace(/^file:/, '');
+      // Resolve relative paths from cwd, absolute paths as-is
+      if (!path.isAbsolute(dbPath)) {
+        dbPath = path.resolve(process.cwd(), dbPath);
+      }
+    } else {
+      dbPath = path.resolve(__dirname, '../prisma/dev.db');
+    }
+
     const adapter = new PrismaBetterSqlite3({ url: dbPath });
     this.client = new PrismaClient({ adapter } as any);
   }

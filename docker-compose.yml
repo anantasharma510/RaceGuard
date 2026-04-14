@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  raceguard:
+    image: test253232/raceguard:latest
+    container_name: raceguard
+    ports:
+      - "7842:7842"
+      - "3004:3004"
+    volumes:
+      - raceguard-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  raceguard-data:

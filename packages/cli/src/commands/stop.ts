@@ -1,42 +1,49 @@
 import { Command } from 'commander';
 import { execSync } from 'child_process';
+import * as path from 'path';
+import * as fs from 'fs';
+import * as os from 'os';
 
-const isWindows = process.platform === 'win32';
+function getComposeFile(): string {
+  return path.join(os.homedir(), '.raceguard', 'docker-compose.yml');
+}
+
+function getDockerComposeCmd(): string {
+  try {
+    execSync('docker compose version', { stdio: 'ignore' });
+    return 'docker compose';
+  } catch {
+    try {
+      execSync('docker-compose --version', { stdio: 'ignore' });
+      return 'docker-compose';
+    } catch {
+      return 'docker compose';
+    }
+  }
+}
 
 export const stopCommand = new Command('stop')
-  .description('Stop the RaceGuard engine running on port 7842')
+  .description('Stop the RaceGuard engine and dashboard')
   .action(() => {
-    console.log('Stopping RaceGuard engine on port 7842...');
+    const composeFile = getComposeFile();
 
-    try {
-      if (isWindows) {
-        // Find and kill process using port 7842 on Windows
-        const result = execSync('netstat -ano | findstr :7842', { encoding: 'utf8' });
-        const lines = result.trim().split('\n');
-        const pids = new Set<string>();
-
-        for (const line of lines) {
-          const parts = line.trim().split(/\s+/);
-          const pid = parts[parts.length - 1];
-          if (pid && pid !== '0') pids.add(pid);
-        }
-
-        if (pids.size === 0) {
-          console.log('No process found on port 7842. Engine may not be running.');
-          return;
-        }
-
-        for (const pid of pids) {
-          execSync(`taskkill /PID ${pid} /F`, { stdio: 'ignore' });
-          console.log(`Killed process ${pid}`);
-        }
-      } else {
-        // macOS/Linux
-        execSync('lsof -ti:7842 | xargs kill -9', { stdio: 'ignore' });
+    if (!fs.existsSync(composeFile)) {
+      // Fallback: try stopping by container name directly
+      try {
+        execSync('docker stop raceguard', { stdio: 'ignore' });
+        execSync('docker rm raceguard', { stdio: 'ignore' });
+        console.log('\x1b[32m✓  RaceGuard stopped.\x1b[0m');
+      } catch {
+        console.log('RaceGuard does not appear to be running.');
       }
+      return;
+    }
 
-      console.log('RaceGuard engine stopped.');
+    const composeCmd = getDockerComposeCmd();
+    try {
+      execSync(`${composeCmd} -f "${composeFile}" down`, { stdio: 'inherit' });
+      console.log('\x1b[32m✓  RaceGuard stopped.\x1b[0m');
     } catch {
-      console.log('No process found on port 7842. Engine may not be running.');
+      console.log('RaceGuard is not running or Docker is not available.');
     }
   });

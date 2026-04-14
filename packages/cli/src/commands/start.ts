@@ -1,71 +1,151 @@
 import { Command } from 'commander';
-import { spawn, SpawnOptions } from 'child_process';
+import { execSync, execFileSync } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as os from 'os';
+import * as https from 'https';
 
 const isWindows = process.platform === 'win32';
 
-function spawnBackground(cmd: string, args: string[], cwd?: string, useShell = false) {
-  const opts: SpawnOptions = {
-    stdio: 'ignore',
-    detached: true,
-    cwd,
-    shell: useShell,
-    ...(isWindows && useShell ? { windowsHide: true } : {}),
-  };
+const COMPOSE_URL =
+  'https://raw.githubusercontent.com/anantasharma510/RaceGuard/main/docker-compose.yml';
 
-  const child = spawn(cmd, args, opts);
-  child.unref();
-  return child;
+function getComposeDir(): string {
+  return path.join(os.homedir(), '.raceguard');
+}
+
+function getComposeFile(): string {
+  return path.join(getComposeDir(), 'docker-compose.yml');
+}
+
+function downloadComposeFile(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const dir = getComposeDir();
+    const file = getComposeFile();
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+    const tmp = file + '.tmp';
+    const dest = fs.createWriteStream(tmp);
+
+    https.get(COMPOSE_URL, (res) => {
+      if (res.statusCode !== 200) {
+        dest.close();
+        fs.unlinkSync(tmp);
+        reject(new Error(`HTTP ${res.statusCode}`));
+        return;
+      }
+      res.pipe(dest);
+      dest.on('finish', () => {
+        dest.close();
+        fs.renameSync(tmp, file); // atomic replace
+        resolve();
+      });
+    }).on('error', (err) => {
+      dest.close();
+      if (fs.existsSync(tmp)) fs.unlinkSync(tmp);
+      reject(err);
+    });
+  });
+}
+
+function ensureComposeFile(): Promise<string> {
+  const file = getComposeFile();
+  return downloadComposeFile()
+    .then(() => file)
+    .catch((err) => {
+      // If download fails but we have a cached copy, use it
+      if (fs.existsSync(file)) {
+        console.log('\x1b[33m⚠  Could not download latest config (offline?), using cached version.\x1b[0m');
+        return file;
+      }
+      throw new Error(`Failed to download config and no cached version found: ${err.message}`);
+    });
+}
+
+function checkDocker(): boolean {
+  try {
+    execSync('docker --version', { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Support both `docker compose` (v2) and `docker-compose` (v1)
+function getDockerComposeCmd(): string {
+  try {
+    execSync('docker compose version', { stdio: 'ignore' });
+    return 'docker compose';
+  } catch {
+    try {
+      execSync('docker-compose --version', { stdio: 'ignore' });
+      return 'docker-compose';
+    } catch {
+      return 'docker compose'; // default, will fail with a clear error
+    }
+  }
+}
+
+function openBrowser(url: string) {
+  try {
+    if (isWindows) {
+      // 'start' is a cmd built-in, must use cmd /c
+      execFileSync('cmd', ['/c', 'start', url], { stdio: 'ignore' });
+    } else if (process.platform === 'darwin') {
+      execFileSync('open', [url], { stdio: 'ignore' });
+    } else {
+      execFileSync('xdg-open', [url], { stdio: 'ignore' });
+    }
+  } catch {
+    // Non-fatal — just print the URL
+    console.log(`   Open manually: ${url}`);
+  }
 }
 
 export const startCommand = new Command('start')
-  .description('Start the RaceGuard engine (and optionally the UI)')
-  .option('--ui', 'Also launch the Next.js dashboard and open browser')
-  .action((options) => {
-    console.log('Starting RaceGuard engine on port 7842...');
+  .description('Start the RaceGuard engine and dashboard via Docker')
+  .option('--ui', 'Open the dashboard in browser after starting')
+  .action(async (options) => {
     console.log('\x1b[33m⚠  USE AT YOUR OWN RISK — experimental tool, may contain bugs.\x1b[0m');
     console.log('\x1b[33m   Only test APIs you own. Author accepts no liability.\x1b[0m\n');
 
-    const engineSrc = path.resolve(__dirname, '../../../engine/src/main.ts');
-    const engineDist = path.resolve(__dirname, '../../../engine/dist/main.js');
-    const bundledEngine = path.resolve(__dirname, '../engine/main.js');
-
-    if (fs.existsSync(bundledEngine)) {
-      spawnBackground(process.execPath, [bundledEngine]);
-    } else if (fs.existsSync(engineDist)) {
-      spawnBackground(process.execPath, [engineDist]);
-    } else {
-      const tsNodeBin = path.resolve(__dirname, '../../../engine/node_modules/.bin/ts-node');
-      const tsNodeExe = isWindows ? tsNodeBin + '.cmd' : tsNodeBin;
-      spawnBackground(tsNodeExe, [engineSrc]);
+    if (!checkDocker()) {
+      console.error('\x1b[31m✗  Docker is not installed or not running.\x1b[0m');
+      console.error('   Install Docker Desktop: https://www.docker.com/products/docker-desktop');
+      process.exit(1);
     }
 
-    setTimeout(() => {
-      console.log('Engine started on http://localhost:7842');
-    }, 1500);
+    const composeCmd = getDockerComposeCmd();
+
+    console.log('Fetching latest config...');
+    let composeFile: string;
+    try {
+      composeFile = await ensureComposeFile();
+    } catch (err: any) {
+      console.error(`\x1b[31m✗  ${err.message}\x1b[0m`);
+      process.exit(1);
+    }
+
+    console.log('Pulling latest Docker image...');
+    try {
+      execSync(`${composeCmd} -f "${composeFile}" pull`, { stdio: 'inherit' });
+    } catch {
+      console.log('\x1b[33m⚠  Could not pull latest image, using cached version if available.\x1b[0m');
+    }
+
+    console.log('Starting RaceGuard...');
+    try {
+      execSync(`${composeCmd} -f "${composeFile}" up -d`, { stdio: 'inherit' });
+    } catch {
+      console.error('\x1b[31m✗  Failed to start containers. Make sure Docker Desktop is running.\x1b[0m');
+      process.exit(1);
+    }
+
+    console.log('\n\x1b[32m✓  RaceGuard started.\x1b[0m');
+    console.log('   Engine:    http://localhost:7842');
+    console.log('   Dashboard: http://localhost:3004\n');
 
     if (options.ui) {
-      console.log('Starting RaceGuard UI on port 3000...');
-      const uiPath = path.resolve(__dirname, '../../../ui');
-
-      if (isWindows) {
-        // On Windows, use cmd /c to run npx next dev — avoids spawn ENOENT with npx.cmd
-        spawnBackground('cmd', ['/c', 'npx next dev'], uiPath, true);
-      } else {
-        spawnBackground('npx', ['next', 'dev'], uiPath);
-      }
-
-      setTimeout(() => {
-        const url = 'http://localhost:3000';
-        console.log(`Opening dashboard: ${url}`);
-        if (isWindows) {
-          spawnBackground('cmd', ['/c', 'start', url], undefined, true);
-        } else if (process.platform === 'darwin') {
-          spawnBackground('open', [url]);
-        } else {
-          spawnBackground('xdg-open', [url]);
-        }
-      }, 4000);
+      setTimeout(() => openBrowser('http://localhost:3004'), 3000);
     }
   });
